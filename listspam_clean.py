@@ -10,7 +10,7 @@ def main():
     repo = "your did"
     target_list = "list uri"
     actor = "target did" 
-    #hi chat
+    #hi chat (fuck you willow)
     client = create_client(pds,user,pwd,session) 
     dids = gather_followers(client,actor)
 
