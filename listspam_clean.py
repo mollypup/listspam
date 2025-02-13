@@ -1,22 +1,17 @@
 from atproto import Client, models
-from time import time
-import datetime
-import json
 
 
 def main():
-    pds = 'https://pds.here'
-    user, pwd = 'handle.here', 'pwd-here'
-    session = 'run create client and get a session key and put it here'
-    repo = "your did"
+    handle, pwd = 'handle.here', 'pwd-here'
+    repo = resolve_handle(handle)
+    pds = resolve_pds(repo)
+    # session = 'run create client and get a session key and put it here'
+    session = None
     target_list = "list uri"
     actor = "target did"
     # hi chat (fuck you willow)
-    client = create_client(pds, user, pwd, session)
+    client = create_client(pds, handle, pwd, session)
     dids = gather_followers(client, actor)
-
-    with open("dids.json") as f:
-        dids = json.load(f)
 
     spam_list_items(client, dids, repo, target_list)
 
@@ -58,7 +53,7 @@ def gather_followers(client, actor):
 
 
 def spam_list_items(client, dids, repo, target_list):
-    created_at = unix_to_iso_string(time())
+    created_at = client.get_current_time_iso()
     list_items = [models.AppBskyGraphListitem.Record(
         created_at=created_at,
         list=target_list,
@@ -86,21 +81,28 @@ def spam_list_items(client, dids, repo, target_list):
         print(f"spammed! {i}")
 
 
-def unix_to_iso_string(timestamp: float | int):
-    """
-    Returns JavaScript-like timestamp strings
-    e.g. 2000-01-01T00:00:00.000Z
-    """
-    return (
-        datetime.datetime.fromtimestamp(timestamp).isoformat(
-            timespec="milliseconds"
-        )
-        + "Z"
-    )
+def resolve_pds(did):
+    if did.startswith("did:plc:"):
+        r = httpx.get(f"https://plc.directory/{did}")
+        r.raise_for_status()
+    elif did.startswith("did:web"):
+        r = httpx.get(f"https://{did.lstrip("did:web")}/.well-known/did.json")
+        r.raise_for_status()
+    else:
+        raise ValueError("Invalid DID Method")
+    for service in r.json()["service"]:
+        if service["id"] == "#atproto_pds":
+            return service["serviceEndpoint"]
 
 
-def iso_string_now():
-    return unix_to_iso_string(time.time())
+def resolve_handle(user):
+    if user.startswith("did:"):
+        did = user
+    else:
+        pub = Client("https://public.api.bsky.app")
+        did = pub.resolve_handle(user).did
+
+    return did
 
 
 def split_list(lst, n):
